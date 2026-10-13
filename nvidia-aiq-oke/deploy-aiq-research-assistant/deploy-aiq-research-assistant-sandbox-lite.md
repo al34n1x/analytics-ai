@@ -56,10 +56,16 @@ read the NVIDIA and Tavily API keys from the Secret created in Lab 1.
    and [Helm values](files/sandbox-lite/aiq-workshop-values.yaml) into Cloud Shell.
    Copy the complete block:
 
+    <!-- PRE-MERGE: Temporary verified fork URL while these assets await upstream publication.
+    Before merging upstream, restore AIQ_FILES_BASE to
+    https://raw.githubusercontent.com/oracle-livelabs/analytics-ai/main/nvidia-aiq-oke/deploy-aiq-research-assistant/files/sandbox-lite
+    and include config_web_frag.yml plus aiq-workshop-values.yaml in the same change.
+    Check both canonical downloads after publication, then remove this reminder. -->
+
     ```bash
     mkdir -p "$HOME/aiq-workshop"
     cd "$HOME/aiq-workshop"
-    export AIQ_FILES_BASE="https://raw.githubusercontent.com/oracle-livelabs/analytics-ai/main/nvidia-aiq-oke/deploy-aiq-research-assistant/files/sandbox-lite"
+    export AIQ_FILES_BASE="https://raw.githubusercontent.com/enschilling/analytics-ai/c0173f4bbcb757b7c9be206f9efcb70d2e915d09/nvidia-aiq-oke/deploy-aiq-research-assistant/files/sandbox-lite"
     curl --fail --location --retry 2 --max-time 60 \
       "$AIQ_FILES_BASE/config_web_frag.yml" -o config_web_frag.yml
     curl --fail --location --retry 2 --max-time 60 \
