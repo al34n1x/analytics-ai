@@ -113,9 +113,18 @@ Complete Lab 1 in this variant. Keep its Cloud Shell session and exported variab
     kubectl rollout status deployment/rag-server --timeout=20m
 
     kubectl wait --for=jsonpath='{.status.state}'=Ready nimservice --all --timeout=90m
-    kubectl wait --for=jsonpath='{.status.health}'=green elasticsearch --all --timeout=30m
+    kubectl wait --for=jsonpath='{.status.phase}'=Ready elasticsearch --all --timeout=30m
+    kubectl get elasticsearch
     kubectl rollout status deployment/rag-frontend --timeout=20m
     ```
+
+    This sandbox uses one Elasticsearch node. `yellow` health is expected when
+    all primary shards are active but replica shards cannot be placed on a second
+    node; it does not block the ingestion and query exercise. Do not wait for
+    `green`, add another node, or delete replicas merely to change the color.
+    If the phase is not `Ready`, health is `red`, or ingestion fails, ask the
+    facilitator to inspect the cluster health and unassigned primary shards.
+    See [Elastic's cluster-health guidance](https://www.elastic.co/docs/troubleshoot/elasticsearch/red-yellow-cluster-status).
 
 ## Task 2: Open and validate RAG
 
