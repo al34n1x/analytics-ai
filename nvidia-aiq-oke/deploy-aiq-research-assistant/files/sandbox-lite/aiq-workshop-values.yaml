@@ -1,0 +1,20 @@
+# AI-Q Helm chart 2.1.0: mount the workshop's complete FRAG configuration.
+# Create aiq-workshop-config in the assigned namespace before Helm installation.
+aiq:
+  apps:
+    backend:
+      env:
+        CONFIG_FILE: configs/config_web_frag.yml
+      volumes:
+        # Helm replaces lists: retain the chart's PostgreSQL initializer volume.
+        - name: postgres-init
+          configMap:
+            name: aiq-postgres-init
+        - name: workshop-aiq-config
+          configMap:
+            name: aiq-workshop-config
+      volumeMounts:
+        - name: workshop-aiq-config
+          mountPath: /app/configs/config_web_frag.yml
+          subPath: config_web_frag.yml
+          readOnly: true
