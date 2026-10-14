@@ -71,9 +71,14 @@ Complete Get Started and obtain the Resources values and API keys listed in the 
     read -rsp "NVIDIA API key (press Enter to reuse NGC key): " NVIDIA_API_KEY; printf '\n'
     NVIDIA_API_KEY="${NVIDIA_API_KEY:-$NGC_API_KEY}"
     read -rsp "Tavily API key: " TAVILY_API_KEY; printf '\n'
-    AIQ_DB_PASSWORD="$(openssl rand -base64 32)"
+    AIQ_DB_PASSWORD="$(openssl rand -hex 32)"
     export NGC_API_KEY NVIDIA_API_KEY TAVILY_API_KEY AIQ_DB_PASSWORD
     ```
+
+    The database password uses 32 random bytes represented as hexadecimal.
+    This keeps it secure and URL-safe: the AI-Q chart inserts the password into
+    database connection URLs without escaping it. Do not substitute a Base64
+    password, which can contain URL delimiters such as `/`.
 
 2. Create only the AI-Q application Secret. RAG Helm creates and owns
    `ngc-secret` and `ngc-api` in Lab 2, Task 1 from the supplied chart values.

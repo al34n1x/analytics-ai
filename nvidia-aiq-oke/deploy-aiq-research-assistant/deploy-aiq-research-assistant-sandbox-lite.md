@@ -134,8 +134,11 @@ read the NVIDIA and Tavily API keys from the Secret created in Lab 1.
 
     ```bash
     kubectl --namespace "$LAB_NAMESPACE" exec deployment/aiq-backend -c backend -- \
-      grep '^[[:space:]]*model_name:' /app/configs/config_web_frag.yml
+      /app/.venv/bin/python -c 'from pathlib import Path; print("\n".join(line.strip() for line in Path("/app/configs/config_web_frag.yml").read_text().splitlines() if line.lstrip().startswith("model_name:")))'
     ```
+
+    Use the backend's installed Python runtime; its container does not include
+    `grep`. This command prints only model names, not credential settings.
 
     Expected result: three `model_name` entries, all using
     `nvidia/nemotron-3-super-120b-a12b`. The internal alias names are retained for
