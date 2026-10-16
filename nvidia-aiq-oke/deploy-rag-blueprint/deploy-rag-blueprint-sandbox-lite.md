@@ -62,28 +62,46 @@ Complete Lab 1 in this variant. Keep its Cloud Shell session and exported variab
     hosted text reranker returned HTTP 410 during validation; changing only
     its endpoint did not resolve the error.
 
-3. Apply the fully qualified SeaweedFS image used during validation and use
-   a quota-safe RAG update strategy, then
-   wait for the RAG services and model downloads. The first model startup
-   took about 16 minutes in the September test; cold downloads can take
-   longer. Temporary volume-mount retries can resolve while the model cache
-   is being attached.
+3. Check the initial pod status, then apply the SeaweedFS image and RAG
+    update-strategy patches below before waiting for services to become ready.
 
-   The RAG server updates one pod at a time without a surge pod. This avoids
-   exceeding the namespace memory quota during upgrades; RAG is briefly
-   unavailable while its single backend pod is replaced. Documents remain
-   stored in Elasticsearch and the persistent object store.
+    ```bash
+    kubectl get pods -n "$LAB_NAMESPACE" -o wide
+    ```
+
+    > **Note:** Some pods may still show `Pending` or `ContainerCreating` at
+    > this stage. Do not wait for all pods to become ready before running the
+    > two `kubectl patch` commands below. Apply both patches immediately, then
+    > run the rollout and readiness checks that follow. If pods remain
+    > `Pending` after the patches, use the troubleshooting lab to investigate.
+
+    The first model startup took about 16 minutes in the September test;
+    cold downloads can take longer. Temporary volume-mount retries can
+    resolve while the model cache is being attached.
+
+    The RAG server updates one pod at a time without a surge pod. This avoids
+    exceeding the namespace memory quota during upgrades; RAG is briefly
+    unavailable while its single backend pod is replaced. Documents remain
+    stored in Elasticsearch and the persistent object store.
 
     ```bash
     kubectl patch deployment rag-seaweedfs-all-in-one --type=json \
       -p='[{"op":"replace","path":"/spec/template/spec/containers/0/image","value":"docker.io/chrislusf/seaweedfs:3.73"}]'
-
+    ```
+    ```bash
     kubectl patch deployment rag-server --type=merge \
       -p='{"spec":{"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxSurge":0,"maxUnavailable":1}}}}'
+    ```
+    ```bash
     kubectl rollout status deployment/rag-server --timeout=20m
-
+    ```
+    ```bash
     kubectl wait --for=jsonpath='{.status.state}'=Ready nimservice --all --timeout=90m
+    ```
+    ```bash
     kubectl wait --for=jsonpath='{.status.health}'=green elasticsearch --all --timeout=30m
+    ```
+    ```bash
     kubectl rollout status deployment/rag-frontend --timeout=20m
     ```
 
@@ -94,8 +112,14 @@ Complete Lab 1 in this variant. Keep its Cloud Shell session and exported variab
 
     ```bash
     kubectl get nimservice
+    ```
+    ```bash
     kubectl get elasticsearch
+    ```
+    ```bash
     kubectl get service rag-frontend
+    ```
+    ```bash
     printf '%s\n' "$RAG_APP_URL"
     ```
 

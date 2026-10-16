@@ -58,9 +58,14 @@ Use only public workshop material. The workshop portals use HTTP and are not int
     ```bash
     kubectl patch deployment aiq-backend --type=json \
       -p='[{"op":"replace","path":"/spec/template/spec/initContainers/0/image","value":"docker.io/bitnami/postgresql:latest"}]'
-
+    ```
+    ```bash
     kubectl rollout status deployment/aiq-postgres --timeout=20m
+    ```
+    ```bash
     kubectl rollout status deployment/aiq-backend --timeout=20m
+    ```
+    ```bash
     kubectl rollout status deployment/aiq-frontend --timeout=20m
     ```
 
@@ -77,6 +82,8 @@ Use only public workshop material. The workshop portals use HTTP and are not int
 
     ```bash
     curl -sf http://127.0.0.1:8000/health
+    ```
+    ```bash
     curl -sf http://127.0.0.1:8000/v1/knowledge/health
     ```
 
@@ -179,6 +186,8 @@ If **Report Failed to Complete** appears, record the job ID and error time. Insp
 
 ```bash
 kubectl --namespace "$LAB_NAMESPACE" get pods
+```
+```bash
 kubectl --namespace "$LAB_NAMESPACE" logs deployment/aiq-backend --since=15m --tail=100
 ```
 
