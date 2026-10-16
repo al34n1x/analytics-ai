@@ -42,12 +42,14 @@ Complete Lab 1 in this variant. Keep its Cloud Shell session and exported variab
       --set server.workers=4,nv-ingest.redis.replica.replicaCount=0 \
       --set nv-ingest.resources.limits.cpu=24,nv-ingest.resources.limits.memory=24Gi \
       --set nimOperator.nim-llm.enabled=true \
+      --set-json 'nimOperator.nim-llm.tolerations=[{"key":"nvidia.com/gpu","operator":"Equal","value":"present","effect":"NoSchedule"}]' \
       --set nimOperator.nim-llm.image.repository=nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b \
       --set-string 'nimOperator.nim-llm.image.tag=2.0.9-variant,nimOperator.nim-llm.model.engine=vllm,nimOperator.nim-llm.model.precision=int4,nimOperator.nim-llm.model.tensorParallelism=1,nimOperator.nim-llm.model.profiles[0]=2ef85c7286907e706eb0d6c4750a1aefa719447097d151ab34c7837fc02bdac4,nimOperator.nim-llm.storage.pvc.size=200Gi,nimOperator.nvidia-nim-llama-nemotron-embed-1b-v2.storage.pvc.size=200Gi' \
       --set 'nimOperator.nim-llm.resources.requests.nvidia\.com/gpu=1,nimOperator.nim-llm.resources.limits.nvidia\.com/gpu=1' \
       --set-json 'nimOperator.nim-llm.env=[{"name":"NIM_HTTP_API_PORT","value":"8000"},{"name":"NIM_TRITON_LOG_VERBOSE","value":"1"},{"name":"NIM_SERVED_MODEL_NAME","value":"nvidia/nemotron-3.5-lightning"},{"name":"NIM_MODEL_PROFILE","value":"2ef85c7286907e706eb0d6c4750a1aefa719447097d151ab34c7837fc02bdac4"}]' \
       --set-string envVars.APP_LLM_MODELNAME=nvidia/nemotron-3.5-lightning,envVars.APP_QUERYREWRITER_MODELNAME=nvidia/nemotron-3.5-lightning,envVars.APP_FILTEREXPRESSIONGENERATOR_MODELNAME=nvidia/nemotron-3.5-lightning,envVars.REFLECTION_LLM=nvidia/nemotron-3.5-lightning,envVars.LLM_ENABLE_THINKING=false,envVars.LLM_MAX_TOKENS=2048 \
       --set nimOperator.nvidia-nim-llama-nemotron-embed-1b-v2.enabled=true,nimOperator.nvidia-nim-llama-nemotron-embed-vl-1b-v2.enabled=false,nimOperator.nvidia-nim-llama-nemotron-rerank-1b-v2.enabled=false \
+      --set-json 'nimOperator.nvidia-nim-llama-nemotron-embed-1b-v2.tolerations=[{"key":"nvidia.com/gpu","operator":"Equal","value":"present","effect":"NoSchedule"}]' \
       --set nimOperator.nvidia-nim-llama-nemotron-rerank-vl-1b-v2.enabled=false \
       --set 'nimOperator.nvidia-nim-llama-nemotron-embed-1b-v2.resources.requests.nvidia\.com/gpu=1,nimOperator.nvidia-nim-llama-nemotron-embed-1b-v2.resources.limits.nvidia\.com/gpu=1' \
       --set-string envVars.APP_EMBEDDINGS_SERVERURL=nemotron-embedding-ms:8000/v1,envVars.APP_EMBEDDINGS_MODELNAME=nvidia/llama-nemotron-embed-1b-v2,ingestor-server.envVars.APP_EMBEDDINGS_SERVERURL=nemotron-embedding-ms:8000/v1,ingestor-server.envVars.APP_EMBEDDINGS_MODELNAME=nvidia/llama-nemotron-embed-1b-v2,nv-ingest.envVars.EMBEDDING_NIM_ENDPOINT=http://nemotron-embedding-ms:8000/v1,nv-ingest.envVars.EMBEDDING_NIM_MODEL_NAME=nvidia/llama-nemotron-embed-1b-v2 \
@@ -104,6 +106,14 @@ Complete Lab 1 in this variant. Keep its Cloud Shell session and exported variab
     ```bash
     kubectl rollout status deployment/rag-frontend --timeout=20m
     ```
+
+    This sandbox uses one Elasticsearch node. `yellow` health is expected when
+    all primary shards are active but replica shards cannot be placed on a second
+    node; it does not block the ingestion and query exercise. Do not wait for
+    `green`, add another node, or delete replicas merely to change the color.
+    If the phase is not `Ready`, health is `red`, or ingestion fails, ask the
+    facilitator to inspect the cluster health and unassigned primary shards.
+    See [Elastic's cluster-health guidance](https://www.elastic.co/docs/troubleshoot/elasticsearch/red-yellow-cluster-status).
 
 ## Task 2: Open and validate RAG
 

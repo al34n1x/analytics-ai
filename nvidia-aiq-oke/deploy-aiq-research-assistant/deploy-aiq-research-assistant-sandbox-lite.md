@@ -2,32 +2,97 @@
 
 ## Introduction
 
-Deploy AI-Q in FRAG mode in the same namespace and connect it to the RAG services from Lab 2. Then act as a cloud architect: use an Oracle document and web research to produce a cited OCI Supercluster evaluation report.
+Deploy NVIDIA AI-Q 2.1.0 in FRAG (Foundational RAG) mode on Oracle Kubernetes
+Engine (OKE), connect it to the RAG services from Lab 2, and generate a short
+answer with a public web citation. AI-Q adds an agent workflow that can choose
+tools, search sources, and synthesize a response rather than only answer from
+an uploaded document.
 
-AI-Q supports both short research answers and longer, asynchronous deep-research jobs. A chat answer, an approved plan, or a successful health check is not a completed research report.
-
-> **Validation status:** The detailed deep-research exercise below is a draft for the next end-to-end test, not a previously validated workflow. The October 6 test validated web-search chat after replacing two retired hosted-model references in the backend configuration. That compatible ConfigMap/Helm override still needs to be included in Task 1 before a fresh deployment can reproduce the tested model settings. Do not publish this draft as fully validated until that prerequisite and Tasks 3–4 pass.
+This lab demonstrates deployment, service connectivity, and short-answer web
+research. AI-Q also supports longer, multi-step deep-research reports, but
+report generation and export are outside this workshop's exercise scope.
 
 ### Objectives
 
-- Install AI-Q and verify backend health.
-- Distinguish a quick web-search answer from a deep-research report.
-- Attach a public document, select research sources, and approve a focused plan.
-- Inspect research progress, verify document and web citations, and export the final report.
+- Create a namespace-scoped ConfigMap with the workshop's hosted-model settings.
+- Deploy AI-Q on OKE and verify its connection to the RAG backend.
+- Generate a short web-research answer and verify its citation.
+- Explain which components run on OCI and which use NVIDIA-hosted APIs.
 
-Estimated Time: 45 minutes, including deployment, document ingestion, research and review. This is a planning estimate; record actual report-generation time during the next test.
+Estimated Time: 25 minutes. Deployment and hosted API response times can vary.
 
 ## Prerequisites
 
-Complete Labs 1 and 2 in this variant. RAG and its local models must be Ready. Keep the same Cloud Shell session, namespace, and credentials. Have the public OCI Supercluster PDF from Lab 2 available on the computer running your browser.
+Complete Labs 1 and 2. RAG and its local models must be Ready. Keep the same
+Cloud Shell session, namespace, kubeconfig, and credentials. The
+`aiq-credentials` Secret from Lab 1 and `ngc-secret` from Lab 2 must exist.
 
-Use only public workshop material. The workshop portals use HTTP and are not intended for confidential documents or sensitive research questions. No additional GPU, network, or administrator access is needed for this exercise.
+Use only public workshop material. The portals use HTTP and are not intended
+for confidential documents or sensitive questions. This lab does not require
+additional GPUs or permission to change OCI networking or shared infrastructure.
 
-## Task 1: Deploy AI-Q 2.1.0 in FRAG mode
+## Task 1: Prepare the AI-Q model configuration
 
-1. Install AI-Q into the same assigned namespace. `aiq.appname` must equal the
-   assigned namespace; the chart otherwise attempts to create a different
-   namespace, which a workshop user is not permitted to use.
+The original hosted model endpoints used by this version of AI-Q were no
+longer available during workshop validation. The supplied configuration uses
+`nvidia/nemotron-3-super-120b-a12b`, which produced a short answer with an Oracle
+web citation in the October 12, 2026 test. It preserves AI-Q's existing agent
+aliases and RAG integration; it does not require rebuilding container images.
+
+The ConfigMap stores application settings, not credentials. AI-Q continues to
+read the NVIDIA and Tavily API keys from the Secret created in Lab 1.
+
+1. Confirm that you can create and patch ConfigMaps in your assigned namespace:
+
+    ```bash
+    kubectl auth can-i create configmaps --namespace "$LAB_NAMESPACE"
+    kubectl auth can-i patch configmaps --namespace "$LAB_NAMESPACE"
+    ```
+
+    Both commands must return `yes`. If either returns `no`, ask the facilitator
+    to check your namespace role; do not switch to an administrator account.
+
+2. Download the [workshop configuration](files/sandbox-lite/config_web_frag.yml)
+   and [Helm values](files/sandbox-lite/aiq-workshop-values.yaml) into Cloud Shell.
+   Copy the complete block:
+
+    <!-- PRE-MERGE: Temporary verified fork URL while these assets await upstream publication.
+    Before merging upstream, restore AIQ_FILES_BASE to
+    https://raw.githubusercontent.com/oracle-livelabs/analytics-ai/main/nvidia-aiq-oke/deploy-aiq-research-assistant/files/sandbox-lite
+    and include config_web_frag.yml plus aiq-workshop-values.yaml in the same change.
+    Check both canonical downloads after publication, then remove this reminder. -->
+
+    ```bash
+    mkdir -p "$HOME/aiq-workshop"
+    cd "$HOME/aiq-workshop"
+    export AIQ_FILES_BASE="https://raw.githubusercontent.com/enschilling/analytics-ai/c0173f4bbcb757b7c9be206f9efcb70d2e915d09/nvidia-aiq-oke/deploy-aiq-research-assistant/files/sandbox-lite"
+    curl --fail --location --retry 2 --max-time 60 \
+      "$AIQ_FILES_BASE/config_web_frag.yml" -o config_web_frag.yml
+    curl --fail --location --retry 2 --max-time 60 \
+      "$AIQ_FILES_BASE/aiq-workshop-values.yaml" -o aiq-workshop-values.yaml
+    ```
+
+    If a download fails, stop and ask the facilitator for the published files.
+    Do not continue with an empty or older configuration.
+
+3. Create the ConfigMap in your namespace. The same name is safe for every
+   attendee because ConfigMaps are namespace-scoped.
+
+    ```bash
+    kubectl --namespace "$LAB_NAMESPACE" create configmap aiq-workshop-config \
+      --from-file=config_web_frag.yml=config_web_frag.yml \
+      --dry-run=client -o yaml |
+    kubectl --namespace "$LAB_NAMESPACE" apply -f -
+    ```
+
+    Expected result: `configmap/aiq-workshop-config created` or `configured`.
+
+## Task 2: Deploy AI-Q in FRAG mode
+
+1. Install AI-Q into the same assigned namespace. `aiq.appname` must equal
+   `$LAB_NAMESPACE`; otherwise the chart attempts to create another namespace.
+   The values file mounts your ConfigMap into the backend while preserving the
+   chart's PostgreSQL initializer volume.
 
     ```bash
     helm upgrade --install aiq210-frag \
@@ -36,6 +101,7 @@ Use only public workshop material. The workshop portals use HTTP and are not int
       --username '$oauthtoken' \
       --password "$NGC_API_KEY" \
       --reset-values \
+      --values aiq-workshop-values.yaml \
       --set aiq.appname="$LAB_NAMESPACE" \
       --set aiq.project.deploymentTarget=kind \
       --set 'aiq.apps.backend.imagePullSecrets[0].name=ngc-secret' \
@@ -52,11 +118,11 @@ Use only public workshop material. The workshop portals use HTTP and are not int
       --wait=false
     ```
 
-2. Correct the PostgreSQL initializer image and wait for the frontend and
-   backend to become ready:
+2. Correct the PostgreSQL initializer image, restart the backend so it loads
+   the ConfigMap even when you repeat the lab, and wait for readiness:
 
     ```bash
-    kubectl patch deployment aiq-backend --type=json \
+    kubectl --namespace "$LAB_NAMESPACE" patch deployment aiq-backend --type=json \
       -p='[{"op":"replace","path":"/spec/template/spec/initContainers/0/image","value":"docker.io/bitnami/postgresql:latest"}]'
     ```
     ```bash
@@ -69,16 +135,15 @@ Use only public workshop material. The workshop portals use HTTP and are not int
     kubectl rollout status deployment/aiq-frontend --timeout=20m
     ```
 
-## Task 2: Check health and test a short answer
-
-1. Validate the application from Cloud Shell without exposing a new public
-   endpoint:
+3. Confirm the backend's mounted model settings without displaying credentials:
 
     ```bash
-    kubectl port-forward service/aiq-backend 8000:8000
+    kubectl --namespace "$LAB_NAMESPACE" exec deployment/aiq-backend -c backend -- \
+      /app/.venv/bin/python -c 'from pathlib import Path; print("\n".join(line.strip() for line in Path("/app/configs/config_web_frag.yml").read_text().splitlines() if line.lstrip().startswith("model_name:")))'
     ```
 
-    In another terminal:
+    Use the backend's installed Python runtime; its container does not include
+    `grep`. This command prints only model names, not credential settings.
 
     ```bash
     curl -sf http://127.0.0.1:8000/health
@@ -87,67 +152,35 @@ Use only public workshop material. The workshop portals use HTTP and are not int
     curl -sf http://127.0.0.1:8000/v1/knowledge/health
     ```
 
-    Stop the port-forward with `Ctrl+C` after the checks succeed.
+## Task 3: Check health and generate a cited short answer
 
-2. Open `$AIQ_APP_URL` and confirm the Research Assistant loads. Open **Data Sources**, select **Connections**, and enable **Web Search**. Leave unrelated connections disabled.
+1. In Cloud Shell, start a local port-forward. This does not create a public
+   endpoint or load balancer:
 
-3. Submit this short question:
+    ```bash
+    kubectl --namespace "$LAB_NAMESPACE" port-forward service/aiq-backend 8000:8000
+    ```
+
+    Leave it running. Open another Cloud Shell terminal and run:
+
+    ```bash
+    curl --fail --show-error --max-time 30 http://127.0.0.1:8000/health
+    curl --fail --show-error --max-time 30 http://127.0.0.1:8000/v1/knowledge/health
+    ```
+
+    Expected results: `status` is `healthy` in both responses, and the knowledge
+    response identifies `foundational_rag`. This confirms service connectivity,
+    not a completed research request. Return to the port-forward terminal and
+    press `Ctrl+C` when both checks pass.
+
+2. Open `$AIQ_APP_URL` from the LiveLabs Resources tab. Confirm the Research
+   Assistant loads. Open **Data Sources**, select **Connections**, and enable
+   **Web Search**. Leave unrelated connections disabled.
+
+3. Submit the short question used in workshop validation:
 
     ```text
     In two or three sentences, what is OCI Supercluster? Use an official Oracle web source and cite it.
-    ```
-
-    Confirm that an answer and a web citation appear. This checks the basic chat, model, and web-search path. It does not satisfy the deep-research completion checks below. If this prompt unexpectedly produces a plan instead, do not start an extra report; proceed with the exercise in Task 3.
-
-## Task 3: Prepare sources and approve a deep-research plan
-
-1. Start a **New Session** for the report. Use this same session through Task 4; attached files belong to a session and should not be assumed available in a different one.
-
-2. Open **Data Sources**. Under **Connections**, enable **Web Search** and **Knowledge Base**. The FRAG configuration connects the knowledge source to the RAG services in your assigned namespace. Leave other sources disabled; this exercise does not require academic-paper search or another API key.
-
-3. Select **Files** and use the upload area to attach the [OCI Supercluster PDF](https://www.oracle.com/a/ocom/docs/cloud/accelerate-ai-with-oci-supercluster.pdf) used in Lab 2. If files already exist, use **+ Add File**. Wait until the file has finished processing and is available for research, with no upload or ingestion error.
-
-    Upload the PDF into this AI-Q session even if you already uploaded it into the RAG portal. Lab 2's `OCI Documentation` collection and an AI-Q session's file collection are not interchangeable merely because both applications use the same RAG backend. Do not change the deployment's `COLLECTION_NAME`, create an ingress, or request extra permissions to attach the document.
-
-    If the Files panel says the backend must be set up, or **Knowledge Base** is unavailable, stop and check `/v1/knowledge/health` using Task 2. Ask the facilitator for help rather than proceeding with a web-only report and treating it as a document-research pass.
-
-4. Close the source panel and submit the following focused request. The scenario asks for analysis and a recommendation, rather than a simple definition, to exercise the deep-research path:
-
-    ```text
-    Perform deep research and prepare a decision brief titled
-    "OCI Supercluster for a Small AI Research Team".
-
-    Scenario: A team is evaluating OCI for multi-node GPU model training
-    and later serving a document-based research assistant on OKE.
-
-    Use the attached OCI Supercluster PDF and official Oracle web sources.
-    Treat the PDF as background, not proof that its hardware examples,
-    availability, or scale figures are still current. Distinguish dated
-    document claims from current web evidence.
-
-    Aim for about 800-1,200 words in these sections:
-    1. Executive summary and recommendation.
-    2. What Supercluster provides: compute, networking, and storage.
-    3. How multi-node training differs from hosting this workshop's
-       two-GPU RAG and AI-Q applications on a shared OKE cluster.
-    4. Three prerequisites or risks to verify before adoption, including
-       GPU capacity and tenancy limits.
-    5. A short proof-of-concept checklist and references.
-
-    Cite at least one specific passage from the attached PDF and two
-    distinct official web pages. If you cannot retrieve the document or
-    verify a claim, say so; do not invent citations, pricing, availability,
-    benchmark results, or guarantees. Keep the scope to this brief.
-    ```
-
-5. If the agent asks clarifying questions, answer in the chat input. For example:
-
-    ```text
-    The audience is a cloud architect planning a small proof of concept.
-    Cover training infrastructure and OKE application serving separately.
-    Use only the attached public PDF and official Oracle web sources.
-    Exclude pricing, regional availability promises, and benchmark comparisons.
-    Keep the report to about 800-1,200 words.
     ```
 
 6. Open **Show Research**, then **Plan**, and review the proposed outline. It should include the document and web evidence, the training-versus-serving distinction, risks, and a recommendation. Answer any remaining clarification request before waiting for a job to start.
@@ -203,7 +236,10 @@ For reference, see NVIDIA's [AI-Q 2.1.0 UI source and interface notes](https://g
 
 ## Conclusion
 
-After completing all checks, you have exercised AI-Q deployment, short-answer research, session document ingestion, plan approval, asynchronous report generation, citation review, and report export. Keep the exported brief as your workshop outcome. If any check failed, record it and work with the facilitator before claiming full completion.
+You deployed AI-Q on OKE using the workshop's model configuration, verified its
+RAG service connection, and generated a short answer with a source you reviewed.
+Together with Lab 2, you have exercised document-grounded RAG and tool-assisted
+web research. You have not generated or validated a deep-research report.
 
 Continue to [Lab 4: Troubleshoot and Clean Up Workshop Resources](../validate-and-clean-up/validate-and-clean-up-sandbox-lite.md).
 

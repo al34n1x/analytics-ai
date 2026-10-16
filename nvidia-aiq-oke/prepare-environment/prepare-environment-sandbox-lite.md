@@ -146,6 +146,11 @@ For additional details, see Oracle's [Using Cloud Shell](https://docs.oracle.com
     export NGC_API_KEY NVIDIA_API_KEY TAVILY_API_KEY AIQ_DB_PASSWORD
     ```
 
+    The database password uses 32 random bytes represented as hexadecimal.
+    This keeps it secure and URL-safe: the AI-Q chart inserts the password into
+    database connection URLs without escaping it. Do not substitute a Base64
+    password, which can contain URL delimiters such as `/`.
+
 2. Create only the AI-Q application Secret. RAG Helm creates and owns
    `ngc-secret` and `ngc-api` in Lab 2, Task 1 from the supplied chart values.
    Pre-creating those names causes a Helm release-ownership error.
